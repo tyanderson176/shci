@@ -86,6 +86,8 @@ class Solver {
   std::array<double, 2> mapreduce_sum(
       const fgpl::DistHashMap<Det, C, DetHasher>& map,
       const std::function<double(const Det& det, const C& hc_sum)>& mapper) const;
+  
+  void print_dmc(const std::string& filename, const size_t& num_dets);
 };
 
 template <class S>
@@ -137,6 +139,8 @@ void Solver<S>::run() {
   hamiltonian.clear();
   eps_tried_prev.clear();
   var_dets.clear_and_shrink();
+
+  print_dmc("dmc.out", 20);
 
   Timer::end();
 
@@ -1054,4 +1058,45 @@ void Solver<S>::print_dets_info() const {
 template <class S>
 std::string Solver<S>::get_wf_filename(const double eps_var) const {
   return Util::str_printf("wf_eps1_%#.2e.dat", eps_var);
+}
+
+void print_occ_orbs(const std::vector<unsigned> orbs, FILE *out) {
+  if (orbs.size() == 0) return;
+  fprintf(out, "%+3u", orbs[0]);
+  for(size_t i = 1; i < orbs.size() ; i++)
+    fprintf(out, "%+4u", orbs[i]);
+}
+
+template <class S>
+void Solver<S>::print_dmc(const std::string& filename, const size_t& num_dets) {
+  const char *name_ptr = filename.c_str();
+  FILE *out_file = fopen(name_ptr, "w");
+  //print det occupation & coeffs
+  std::vector<size_t> det_order(system.dets.size());
+  for (size_t i = 0; i < system.dets.size(); i++) {
+    det_order[i] = i;
+  }
+  std::stable_sort(det_order.begin(), det_order.end(), 
+    [&](const size_t a, const size_t b) {
+      return std::abs(system.coefs[a]) > std::abs(system.coefs[b]);
+    });
+
+  //print det occupation
+  for (size_t i=0; i < std::min(num_dets, system.dets.size()); i++) {
+    const Det& det = system.dets[det_order[i]];
+    const std::vector<unsigned>& up_elecs = det.up.get_occupied_orbs();
+    const std::vector<unsigned>& dn_elecs = det.dn.get_occupied_orbs();
+    print_occ_orbs(up_elecs, out_file);
+    fprintf(out_file, "    ");
+    print_occ_orbs(dn_elecs, out_file);
+    //no det label
+    fprintf(out_file, "\n");
+  }
+
+  //print det coeffs
+  for (size_t i=0; i < std::min(num_dets, system.dets.size()); i++) {
+    fprintf(out_file, "%+15.8f", system.coefs[det_order[i]]); 
+  }
+  fprintf(out_file, "\n");
+  fclose(out_file);
 }
