@@ -595,6 +595,10 @@ void ChemSystem::post_variation(const std::vector<std::vector<size_t>>& connecti
     rdm.get_1rdm(dets, coefs, integrals, true);
     Timer::end();
   }
+
+  auto ndets = Config::get<size_t>("dmc_num_dets", 0);
+  if (ndets > 0) print_dmc(ndets);
+
 }
 
 //======================================================
@@ -659,8 +663,50 @@ double ChemSystem::get_s2() const {
     }  // i_orb
   }  // i_det
 
-  if (Parallel::is_master()) {
-    printf("s_squared: %15.10f\n", s2);
-  }
+//  if (Parallel::is_master()) {
+//    printf("s_squared: %15.10f\n", s2);
+//  }
   return s2;
+}
+
+void print_occ_orbs(const std::vector<unsigned> orbs) {
+  if (orbs.size() == 0) return;
+  printf("%3u", orbs[0]);
+  for (size_t i = 1; i < orbs.size(); i++) printf("%4u", orbs[i]);
+}
+
+void ChemSystem::print_dmc(const size_t& num_dets) const {
+  //  const char *name_ptr = filename.c_str();
+  //  FILE *out_file = fopen(name_ptr, "w");
+  printf("\nSTART DMC\n");
+  // print det occupation & coeffs
+  std::vector<size_t> det_order(dets.size());
+  for (size_t i = 0; i < dets.size(); i++) {
+    det_order[i] = i;
+  }
+  std::stable_sort(det_order.begin(), det_order.end(), [&](const size_t a, const size_t b) {
+    return std::abs(coefs[a]) > std::abs(coefs[b]);
+  });
+
+  // print det occupation
+  for (size_t i = 0; i < std::min(num_dets, dets.size()); i++) {
+    const Det& det = dets[det_order[i]];
+    const std::vector<unsigned>& up_elecs = det.up.get_occupied_orbs();
+    const std::vector<unsigned>& dn_elecs = det.dn.get_occupied_orbs();
+    print_occ_orbs(up_elecs);
+    printf("    ");
+    print_occ_orbs(dn_elecs);
+    // no det label
+    printf("\n");
+  }
+
+  // print det coeffs
+  printf("DET COEFFS:\n");
+  for (size_t i = 0; i < std::min(num_dets, dets.size()); i++) {
+    printf("%15.8f", coefs[det_order[i]]);
+  }
+  printf("\nS^2 VAL:\n");
+  printf("%15.8f", get_s2());
+  printf("\nEND DMC\n");
+  //  fclose(out_file);
 }

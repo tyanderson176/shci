@@ -77,4 +77,6 @@ class ChemSystem : public BaseSystem {
   double get_two_body_double(const DiffResult& diff_up, const DiffResult& diff_dn) const;
 
   double get_s2() const;
+
+  void print_dmc(const size_t& num_dets) const;
 };
